@@ -5,9 +5,9 @@ MODEL:
   IF_WITH_CENTER: 'no'
   NAME: 'ViT-B-16'
   STRIDE_SIZE: [16, 16]
-  ID_LOSS_WEIGHT : 0.25
-  TRIPLET_LOSS_WEIGHT : 1.0
-  I2T_LOSS_WEIGHT : 1.0
+  ID_LOSS_WEIGHT : 0.25 # 0.25
+  TRIPLET_LOSS_WEIGHT : 1.0 # 1
+  I2T_LOSS_WEIGHT : 1.0 # 1
   # SIE_CAMERA: True
   # SIE_COE : 1.0
 
@@ -22,10 +22,12 @@ INPUT:
 
 DATALOADER:
   SAMPLER: 'softmax_triplet'
-  NUM_INSTANCE: 4
+  NUM_INSTANCE: 2 # 每个身份在一个批次中应该有的样本数量
   NUM_WORKERS: 8
 
 SOLVER:
+  SEED: 33
+
   STAGE1:
     IMS_PER_BATCH: 256
     OPTIMIZER_NAME: "Adam"
@@ -36,24 +38,24 @@ SOLVER:
     WEIGHT_DECAY:  1e-4
     WEIGHT_DECAY_BIAS: 1e-4
     MAX_EPOCHS: 120 # 120
-    CHECKPOINT_PERIOD: 60
+    CHECKPOINT_PERIOD: 120
     LOG_PERIOD: 50
     WARMUP_EPOCHS: 5
   
   STAGE2:
-    IMS_PER_BATCH: 256
+    IMS_PER_BATCH: 256 # 64
     OPTIMIZER_NAME: "Adam"
-    BASE_LR: 0.000005
+    BASE_LR: 0.0005 # 0.000005
     WARMUP_METHOD: 'linear'
-    WARMUP_ITERS: 10
+    WARMUP_ITERS: 10 # 10
     WARMUP_FACTOR: 0.1
     WEIGHT_DECAY:  0.0001
     WEIGHT_DECAY_BIAS: 0.0001
-    LARGE_FC_LR: False
+    LARGE_FC_LR: False # False
     MAX_EPOCHS: 120
-    CHECKPOINT_PERIOD: 60
-    LOG_PERIOD: 50
-    EVAL_PERIOD: 2
+    CHECKPOINT_PERIOD: 120
+    LOG_PERIOD: 1 # 50
+    EVAL_PERIOD: 10 # 60
     BIAS_LR_FACTOR: 2
     
     STEPS: [30, 50]
@@ -61,15 +63,38 @@ SOLVER:
   
 TEST:
   EVAL: True
-  IMS_PER_BATCH: 64
+  IMS_PER_BATCH: 256
   RE_RANKING: False
-  WEIGHT: './output/vit_domain_shift_clip/market1501ViT-B-16_stage1_120.pth' # 想要加载的模型的位置
+  WEIGHT: './output/vit_domain_shift_clip/msmt17ViT-B-16_stage2_60.pth' # 想要加载的模型的位置
   NECK_FEAT: 'before'
   FEAT_NORM: 'yes'
 
+Stage3:
+   NAMES: ('msmt17_2_supportset_of_market1501_2imgs') # support_set train的时候修改
+   ROOT_DIR: ('./support_set')
+   MAX_EPOCHS: 200
+   BATCH_SIZE: 256
+   CHECKPOINT_PERIOD: 200
+   TEST_WEIGHT: './output/vit_domain_shift_clip/stage3_best_market1501_2_dukemtmc__student_model.pth' # stage3_best_dukemtmc_2_market1501__student_model.pth
 
-DATASETS:
-   WEIGHT: './output/vit_domain_shift_clip/market1501ViT-B-16_stage1_120.pth'
+
+DATASETS: # train的时候修改
+#   WEIGHT: './output/vit_domain_shift_clip/market1501ViT-B-16_stage1_120.pth' # source domain stage1 trained model
+#   NAMES: ('market1501')
+#   ROOT_DIR: ('/home/sanicee/PycharmProjects/Market-1501-v15.09.15_')
+
+#   WEIGHT: './output/vit_domain_shift_clip/dukemtmcViT-B-16_stage1_120.pth'
+#   NAMES: ('dukemtmc')
+#   ROOT_DIR: ('/home/sanicee/PycharmProjects/')
+
+#   NAMES: ('occ_duke')
+#   ROOT_DIR: ('')
+
+   WEIGHT: './output/vit_domain_shift_clip/msmt17ViT-B-16_stage1_120.pth' # source domain stage1 trained model
+   NAMES: ('msmt17')
+   ROOT_DIR: ('/home/sanicee/PycharmProjects/')
+
+Domain_Shift_DATASETS:
    NAMES: ('market1501')
    ROOT_DIR: ('/home/sanicee/PycharmProjects/')
 
@@ -80,20 +105,7 @@ DATASETS:
 #   ROOT_DIR: ('')
 
 #   NAMES: ('msmt17')
-#   ROOT_DIR: ('/home/sanicee/PycharmProjects/')
-
-Domain_Shift_DATASETS:
-#   NAMES: ('market1501')
-#   ROOT_DIR: ('/home/sanicee/PycharmProjects/')
-
-   NAMES: ('dukemtmc')
-   ROOT_DIR: ('/home/sanicee/PycharmProjects/')
-
-#   NAMES: ('occ_duke')
-#   ROOT_DIR: ('')
-
-#   NAMES: ('msmt17')
-#   ROOT_DIR: ('/home/sanicee/PycharmProjects/')
+#   ROOT_DIR: ('/home/sanicee/PycharmProjects/MSMT17_')
 
 OUTPUT_DIR: './output/vit_domain_shift_clip'
 

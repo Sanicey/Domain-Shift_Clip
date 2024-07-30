@@ -150,8 +150,8 @@ class build_transformer(nn.Module):
         feat_proj = self.bottleneck_proj(img_feature_proj) # 256,512
         
         if self.training:
-            cls_score = self.classifier(feat) # 256,751
-            cls_score_proj = self.classifier_proj(feat_proj) # 256,751
+            cls_score = self.classifier(feat) # 256,num_class
+            cls_score_proj = self.classifier_proj(feat_proj) # 256,num_class
             return [cls_score, cls_score_proj], [img_feature_last, img_feature, img_feature_proj], img_feature_proj
 
         else:

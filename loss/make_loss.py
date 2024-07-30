@@ -25,6 +25,7 @@ def make_loss(cfg, num_classes):    # modified by gu
         print('expected METRIC_LOSS_TYPE should be triplet'
               'but got {}'.format(cfg.MODEL.METRIC_LOSS_TYPE))
 
+    # 标签平滑 对类别标签进行平滑处理，以防止模型对某些类别过于自信。
     if cfg.MODEL.IF_LABELSMOOTH == 'on':
         xent = CrossEntropyLabelSmooth(num_classes=num_classes)
         print("label smooth on, numclasses:", num_classes)
@@ -38,7 +39,7 @@ def make_loss(cfg, num_classes):    # modified by gu
             if cfg.MODEL.METRIC_LOSS_TYPE == 'triplet':
                 if cfg.MODEL.IF_LABELSMOOTH == 'on':
                     if isinstance(score, list):
-                        ID_LOSS = [xent(scor, target) for scor in score[0:]]
+                        ID_LOSS = [xent(scor, target) for scor in score[0:]] # 分类损失？
                         ID_LOSS = sum(ID_LOSS)
                     else:
                         ID_LOSS = xent(score, target)
@@ -54,7 +55,9 @@ def make_loss(cfg, num_classes):    # modified by gu
                     if i2tscore != None:
                         I2TLOSS = xent(i2tscore, target)
                         loss = cfg.MODEL.I2T_LOSS_WEIGHT * I2TLOSS + loss
-                        
+
+                    print("loss:{:.3f}, ID_loss:{:.3f}, TRI_loss:{:.3f}, I2T_loss:{:.3f}".format(loss, ID_LOSS, TRI_LOSS, I2TLOSS))
+
                     return loss
                 else:
                     if isinstance(score, list):
@@ -70,6 +73,7 @@ def make_loss(cfg, num_classes):    # modified by gu
                             TRI_LOSS = triplet(feat, target)[0]
 
                     loss = cfg.MODEL.ID_LOSS_WEIGHT * ID_LOSS + cfg.MODEL.TRIPLET_LOSS_WEIGHT * TRI_LOSS
+                    print("loss:{:.3f}, ID_loss:{:.3f}, TRI_loss:{:.3f} ".format(loss, ID_LOSS, TRI_LOSS))
                     
                     if i2tscore != None:
                         I2TLOSS = F.cross_entropy(i2tscore, target)

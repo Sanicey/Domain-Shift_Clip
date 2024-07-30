@@ -71,7 +71,9 @@ class MSMT17(BaseImageDataset):
             pid = int(pid)  # no need to relabel
             camid = int(img_path.split('_')[2])
             img_path = osp.join(dir_path, img_path)
+
             dataset.append((img_path, self.pid_begin+pid, camid-1, 0))
+
             pid_container.add(pid)
             cam_container.add(camid)
         print(cam_container, 'cam_container')

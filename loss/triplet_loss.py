@@ -133,4 +133,22 @@ class TripletLoss(object):
             loss = self.ranking_loss(dist_an - dist_ap, y)
         return loss, dist_ap, dist_an
 
+if __name__=="__main__":
+    import torch
+    from torch.autograd import Variable
+
+    # 假设我们有一些全局特征和对应的标签
+    global_feat = Variable(torch.rand(100, 50))  # 100个样本，每个样本有50个特征
+    labels = Variable((torch.rand(100) * 10).long())  # 100个样本，每个样本有一个标签
+
+    # 初始化TripletLoss对象
+    triplet_loss = TripletLoss(margin=0.5, hard_factor=0.2)
+
+    # 计算损失
+    loss, dist_ap, dist_an = triplet_loss(global_feat, labels, normalize_feature=True)
+
+    print('Loss:', loss)
+    print('dist_ap:', dist_ap)
+    print('dist_an:', dist_an)
+
 

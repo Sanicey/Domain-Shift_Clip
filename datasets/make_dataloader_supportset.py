@@ -14,6 +14,7 @@ from PIL import Image
 import os
 from torchvision.transforms import Compose, Resize, ToTensor
 import random
+from torchvision import datasets, transforms
 
 def train_collate_fn(batch):
     """
@@ -54,19 +55,20 @@ def make_dataloader_supportset2(cfg, num_of_splits = 100):
 
     # 修改预处理函数，以适应多张图片
     preprocess = Compose([
-        Resize((256,128)),
-        ToTensor()
+        transforms.Resize((256, 128)),  # 调整图片大小
+        transforms.ToTensor(),
+        # transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])  # 标准化，这里使用的是ImageNet的均值和方差
+        # T.Normalize(mean=cfg.INPUT.PIXEL_MEAN, std=cfg.INPUT.PIXEL_STD)  # 11
     ])
 
     # target_domain_dataset.traindir 目标图片所在文件夹地址
-    # 有个问题，读入的是原始数据，没有transform
-    train_dir = target_domain_dataset.train_dir
+    train_dir = target_domain_dataset.train_dir # target domain train_dir
     # image_paths = [os.path.join(train_dir, img) for img in os.listdir(train_dir)]
-    image_paths = [os.path.join(train_dir, img) for img in os.listdir(train_dir)]
+    image_paths = [os.path.join(train_dir, img) for img in os.listdir(train_dir) if img.endswith(('.png', '.jpg', '.jpeg'))]
     images = [Image.open(img_path) for img_path in image_paths]
 
     # 打乱图片顺序
-    random.shuffle(images)
+    # random.shuffle(images)
 
     # 将图片分割成等大小的列表
     split_images = []
@@ -85,6 +87,6 @@ def make_dataloader_supportset2(cfg, num_of_splits = 100):
     # target_domain_all_images = torch.stack([preprocess(img)for img in images])
 
     # 预处理图片，每一组内部拼接在一起
-    target_domain_all_images = [torch.stack([preprocess(img) for img in img_list]) for img_list in split_images]
+    target_domain_all_images = [torch.stack([preprocess(img) for img in img_list]) for img_list in split_images] # 100 * (130,3,256,128)
 
-    return target_domain_all_images, images
+    return target_domain_all_images, image_paths

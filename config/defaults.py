@@ -239,6 +239,18 @@ _C.TEST.FEAT_NORM = 'yes'
 _C.TEST.DIST_MAT = "dist_mat.npy"
 # Whether calculate the eval score option: 'True', 'False'
 _C.TEST.EVAL = False
+
+# ---------------------------------------------------------------------------- #
+# Stage3
+# ---------------------------------------------------------------------------- #
+_C.Stage3 = CN()
+_C.Stage3.NAMES = 'dukememc_0.8'
+_C.Stage3.ROOT_DIR = './support_set'
+_C.Stage3.MAX_EPOCHS = 120
+_C.Stage3.BATCH_SIZE = 1
+_C.Stage3.CHECKPOINT_PERIOD = 10
+_C.Stage3.TEST_WEIGHT = ' '
+
 # ---------------------------------------------------------------------------- #
 # Misc options
 # ---------------------------------------------------------------------------- #

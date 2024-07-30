@@ -35,7 +35,7 @@ def do_train_stage2(cfg,
         model.to(local_rank)
         if torch.cuda.device_count() > 1:
             print('Using {} GPUs for training'.format(torch.cuda.device_count()))
-            model = nn.DataParallel(model)  
+            model = nn.DataParallel(model)
             num_classes = model.module.num_classes
         else:
             num_classes = model.num_classes # 从model中继承
@@ -46,7 +46,7 @@ def do_train_stage2(cfg,
     evaluator = R1_mAP_eval(num_query, max_rank=50, feat_norm=cfg.TEST.FEAT_NORM)
     scaler = amp.GradScaler()
     xent = SupConLoss(device)
-    
+
     # train
     import time
     from datetime import timedelta
@@ -57,10 +57,10 @@ def do_train_stage2(cfg,
     i_ter = num_classes // batch
     left = num_classes-batch* (num_classes//batch)
     if left != 0 :
-        i_ter = i_ter+1
+        i_ter = i_ter+1 # 计算需要迭代的次数
     text_features = []
 
-    # 获得source domain的number_class和对应的训练好的text_embedding
+    # 获得source domain的number_class和对应的训练好的text_embedding 取出来text_features即为frozen，避免参数再次被更新
     with torch.no_grad():
         for i in range(i_ter):
             if i+1 != i_ter:
@@ -81,23 +81,18 @@ def do_train_stage2(cfg,
         scheduler.step()
 
         model.train()
-        for n_iter, (img, vid, target_cam, target_view) in enumerate(train_loader_stage2): # img 256,3,256,128 # 这里要使用support的数据 img和对应的text_features
+        for n_iter, (img, labels, _, _) in enumerate(train_loader_stage2): # img 256,3,256,128 # 这里要使用support的数据 img和对应的text_features
             optimizer.zero_grad()
             optimizer_center.zero_grad()
             img = img.to(device)
-            target = vid.to(device) # 256 表示对应的标签
-            if cfg.MODEL.SIE_CAMERA:
-                target_cam = target_cam.to(device)
-            else: 
-                target_cam = None
-            if cfg.MODEL.SIE_VIEW:
-                target_view = target_view.to(device)
-            else: 
-                target_view = None
+            target = labels.to(device) # 256 表示对应的标签
+            target_cam = None
+            target_view = None
+
             with amp.autocast(enabled=True):
                 # 实际上只传入了img，然后获得了对应的image_features和scores等 target_cam和target_view都是None
                 score, feat, image_features = model(x = img, label = target, cam_label=target_cam, view_label=target_view) # [cls_score, cls_score_proj], [img_feature_last, img_feature, img_feature_proj], img_feature_proj
-                logits = image_features @ text_features.t() # 置信度 (256,512)@(1041.512).t()->(256,1041)
+                logits = (4 * image_features @ text_features.t()).softmax(dim=-1) # 置信度
                 loss = loss_fn(score, feat, target, target_cam, logits)
 
             scaler.scale(loss).backward()
@@ -111,7 +106,6 @@ def do_train_stage2(cfg,
                 scaler.step(optimizer_center)
                 scaler.update()
 
-            # logits 是模型的输出，max(1) 对每一行取最大值，返回两个结果，一个是最大值，一个是最大值对应的索引。[1] 表示我们只关心最大值的索引，也就是模型预测的类别。
             acc = (logits.max(1)[1] == target).float().mean()
 
             loss_meter.update(loss.item(), img.shape[0])
@@ -135,10 +129,10 @@ def do_train_stage2(cfg,
             if cfg.MODEL.DIST_TRAIN:
                 if dist.get_rank() == 0:
                     torch.save(model.state_dict(),
-                               os.path.join(cfg.OUTPUT_DIR, cfg.DATASETS.NAMES + cfg.MODEL.NAME + '_stage2_{}.pth'.format(epoch)))
+                               os.path.join(cfg.OUTPUT_DIR, cfg.DATASETS.NAMES + cfg.MODEL.NAME + '_stage3_{}.pth'.format(epoch)))
             else:
                 torch.save(model.state_dict(),
-                           os.path.join(cfg.OUTPUT_DIR, cfg.DATASETS.NAMES + cfg.MODEL.NAME + '_stage2_{}.pth'.format(epoch)))
+                           os.path.join(cfg.OUTPUT_DIR, cfg.DATASETS.NAMES + cfg.MODEL.NAME + '_stage3_{}.pth'.format(epoch)))
 
         if epoch % eval_period == 0:
             if cfg.MODEL.DIST_TRAIN:
@@ -149,11 +143,11 @@ def do_train_stage2(cfg,
                             img = img.to(device)
                             if cfg.MODEL.SIE_CAMERA:
                                 camids = camids.to(device)
-                            else: 
+                            else:
                                 camids = None
                             if cfg.MODEL.SIE_VIEW:
                                 target_view = target_view.to(device)
-                            else: 
+                            else:
                                 target_view = None
                             feat = model(img, cam_label=camids, view_label=target_view)
                             evaluator.update((feat, vid, camid))
@@ -170,11 +164,11 @@ def do_train_stage2(cfg,
                         img = img.to(device)
                         if cfg.MODEL.SIE_CAMERA:
                             camids = camids.to(device)
-                        else: 
+                        else:
                             camids = None
                         if cfg.MODEL.SIE_VIEW:
                             target_view = target_view.to(device)
-                        else: 
+                        else:
                             target_view = None
                         feat = model(img, cam_label=camids, view_label=target_view) # torch.cat([img_feature, img_feature_proj], dim=1)
                         evaluator.update((feat, vid, camid))
@@ -216,11 +210,11 @@ def do_inference(cfg,
             img = img.to(device)
             if cfg.MODEL.SIE_CAMERA:
                 camids = camids.to(device)
-            else: 
+            else:
                 camids = None
             if cfg.MODEL.SIE_VIEW:
                 target_view = target_view.to(device)
-            else: 
+            else:
                 target_view = None
             feat = model(img, cam_label=camids, view_label=target_view)
             evaluator.update((feat, pid, camid))

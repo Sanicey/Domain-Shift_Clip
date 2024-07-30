@@ -60,7 +60,7 @@ if __name__ == "__main__":
     # # 爆显存
     # # 爆显存 分4个 这里用了10G显存？？
     num_of_splits = 100
-    target_domain_all_images, image_paths = make_dataloader_supportset2(cfg, num_of_splits) # from target domain
+    target_domain_all_images, image_paths  = make_dataloader_supportset2(cfg, num_of_splits) # from target domain
 
     # load model of stage1 or stage2(just for the tokens in model.dict()), get tokens
     model = make_model(cfg, num_class=num_classes, camera_num=camera_num, view_num = view_num)
@@ -68,12 +68,18 @@ if __name__ == "__main__":
     model.eval()
     model.to("cuda")
 
+    # 使用训练好的stage2的img_encoder 代替clip的img_encoder
+    teacher_model = make_model(cfg, num_class=num_classes, camera_num=camera_num, view_num=view_num)
+    teacher_model.load_param(cfg.TEST.WEIGHT)
+    teacher_model.eval()
+    teacher_model.to("cuda")
+
     image_features_list = []
 
     for imgs in target_domain_all_images:
         imgs = imgs.to("cuda")
         with torch.no_grad():
-            image_features = model(x=imgs, get_image = True)
+            image_features = teacher_model(x=imgs, get_image = True)
             for i in image_features:
                 image_features_list.append(i.cpu())
 
@@ -90,52 +96,34 @@ if __name__ == "__main__":
     # score, feat, image_features : [cls_score, cls_score_proj], [img_feature_last, img_feature, img_feature_proj], img_feature_proj
     # score, feat, image_features = model.image_encoder(target_domain_all_images)
 
-    # # 设置阈值
-    # threshold = 0.8
-    # 设置每个类别存下的样本数量
-    num_label = 2
+    # 设置阈值
+    threshold = 0.8
 
     # 创建文件夹
-    folder_name = "./support_set/" + cfg.DATASETS.NAMES + "_2_supportset_of_" + cfg.Domain_Shift_DATASETS.NAMES + "_" + str(num_label) + "imgs"
+    folder_name = "./support_set/" + cfg.Domain_Shift_DATASETS.NAMES + "_" + str(threshold) + "_stage2_img_encoder"
     os.makedirs(folder_name, exist_ok=True)
 
     all_saved = 0  # 总共保存的图片数量
+    only_one = 0  # 仅保存1张图片的数量
 
     # 遍历 对每一个text_features找相似的图片
     for i in range(num_classes):
         text_feature = model(label = torch.tensor([i]).to("cuda"), get_text = True).to("cpu") # (1,512) # 好像没做归一化？？
 
-        # similarity = (10 * text_feature @ image_features_list.T).softmax(dim=-1) # (1,512) @ (16522,512).T
-        # similarity = (3 * text_feature @ image_features_list.t() ).softmax(dim=-1) # (1,512)@(12936,512).t
-        similarity = (4 * image_features_list @ text_feature.t()).t().softmax(dim=-1) # (12936, 512)@(1,512).t()
+        # similarity = (3 * text_feature @ image_features_list.T).softmax(dim=-1) # (1,512) @ (16522,512).T
+        similarity = (3 * text_feature @ image_features_list.T).softmax(dim=-1)
 
-        # # 阈值
-        # indices = torch.where(similarity[0] > threshold)[0]
-        # values = similarity[0][indices]
-        #
-        # all_saved += len(indices)
-        #
-        # # 如果相似度大于阈值的图片少于2张，就保存相似度最高的两张图片
-        # if len(indices) < num_label:
-        #     all_saved += num_label - len(indices)
-        #     only_two += num_label - len(indices)
-        #     values, indices = torch.topk(similarity[0], 2)
-        #
-        #
-        # # 创建子文件夹
-        # sub_folder_name = os.path.join(folder_name, str(i))
-        # os.makedirs(sub_folder_name, exist_ok=True)
-        #
-        # # 保存图片
-        # for index in indices:
-        #     img_path = image_paths[index]
-        #     img = Image.open(img_path)
-        #     img.save(os.path.join(sub_folder_name, os.path.basename(img_path)))
-        #
-        # print(f"Class {i}: saved {len(indices)} images.")
+        # 阈值
+        indices = torch.where(similarity[0] > threshold)[0]
+        values = similarity[0][indices]
 
-        # 前10
-        values, indices = torch.topk(similarity[0], num_label) # 返回输入张量中k个最大值及其对应的索引
+        all_saved += len(indices)
+
+        # 如果没有图片的相似度大于阈值，那么就保存相似度最高的图片
+        if len(indices) == 0:
+            values, indices = torch.topk(similarity[0], 1)
+            only_one += 1
+            all_saved += 1
 
         # 创建子文件夹
         sub_folder_name = os.path.join(folder_name, str(i))
@@ -146,13 +134,18 @@ if __name__ == "__main__":
             img_path = image_paths[index]
             img = Image.open(img_path)
             img.save(os.path.join(sub_folder_name, os.path.basename(img_path)))
-            all_saved += 1
 
-        print("\nTop predictions:")
-        for value, index in zip(values, indices):
-            id = image_paths[index]
-            print(f"Index: {index}  匹配度: {value.item():.2f} id: {id}")
+        print(f"Class {i}: saved {len(indices)} images.")
+
+        # 前10
+        # values, indices = torch.topk(similarity[0], 10)
+
+        # print("\nTop predictions:")
+        # for value, index in zip(values, indices):
+        #     id = image_set[index]
+        #     print(f"Index: {index}  匹配度: {100.0 * value.item():.2f}%")
 
 
     print("共保存图片：", all_saved)
-    # market1501 -> duke
+    print("未达到阈值的图片数量：", only_one)
+    #
